@@ -97,7 +97,7 @@ function compress(req, res, input) {
 async function hhproxy(req, res) {
   const url = req.query.url;
   if (!url) {
-    return res.send("bandwidth-hero-proxy");
+    return res.end("bandwidth-hero-proxy");
   }
 
   req.params = {
