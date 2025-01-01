@@ -2,7 +2,7 @@
 
 import http from "http";
 import url from "url";
-import proxy from "./proxy1.js";
+import proxy from "./proxy.js";
 
 const PORT = process.env.PORT || 8080;
 
