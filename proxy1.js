@@ -74,8 +74,8 @@ function compress(req, res, input) {
       .then((metadata) => {
         if (metadata.height > 16383) {
           sharpInstance.resize({
-            height: 16383,
-            withoutEnlargement: true,
+            height: 16383
+          //  withoutEnlargement: true,
           });
         }
 
