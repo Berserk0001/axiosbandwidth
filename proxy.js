@@ -1,54 +1,28 @@
 "use strict";
-
 import axios from "axios";
 import sharp from "sharp";
+import UserAgent from "user-agents";
 
 const DEFAULT_QUALITY = 40;
-const MIN_COMPRESS_LENGTH = 1024;  // Minimum size for compression
-const MIN_TRANSPARENT_COMPRESS_LENGTH = MIN_COMPRESS_LENGTH * 100;  // Threshold for PNG/GIF compression
+const MIN_COMPRESS_LENGTH = 1024;
+const MIN_TRANSPARENT_COMPRESS_LENGTH = MIN_COMPRESS_LENGTH * 100;
 
-// Function to handle compression with Sharp
-function compressImageStream(inputStream, format, quality) {
-  sharp.cache(false);
-  sharp.simd(true);
-
-  const transformer = sharp({ unlimited: true });
-  return inputStream
-    .pipe(transformer)
-    .toFormat(format, { quality })
-    .on("error", (err) => {
-      console.error("Sharp processing error:", err.message);
-      throw err;
-    });
-}
-
-// Function to fetch image via Axios
-async function fetchImage(url, options = {}) {
-  try {
-    const response = await axios.get(url, {
-      responseType: "stream",
-      ...options,
-    });
-
-    if (!response.headers["content-type"].startsWith("image")) {
-      throw new Error("URL does not point to an image.");
+function copyHeaders(source, target) {
+  for (const [key, value] of Object.entries(source.headers)) {
+    try {
+      target.setHeader(key, value);
+    } catch (e) {
+      console.error(`Error copying header ${key}:`, e.message);
     }
-
-    return response;
-  } catch (err) {
-    console.error("Error fetching image:", err.message);
-    throw err;
   }
 }
 
-// Function to determine if the image should be compressed
 function shouldCompress(req) {
   const { originType, originSize, webp } = req.params;
 
   if (!originType.startsWith("image")) return false;
   if (originSize === 0 || req.headers.range) return false;
 
-  // Only compress PNG/GIF if large enough or webp is requested
   if (
     !webp &&
     (originType.endsWith("png") || originType.endsWith("gif")) &&
@@ -57,52 +31,110 @@ function shouldCompress(req) {
     return false;
   }
 
-  // Compress webp images only if above the minimum size threshold
   if (webp && originSize < MIN_COMPRESS_LENGTH) return false;
 
   return true;
 }
 
-// Proxy and Compression Endpoint
-export async function imageProxy(req, res) {
-  const { url, format = "webp", quality = DEFAULT_QUALITY } = req.query;
+function redirect(req, res) {
+  if (res.headersSent) return;
 
+  res.setHeader("content-length", 0);
+  res.removeHeader("cache-control");
+  res.removeHeader("expires");
+  res.removeHeader("date");
+  res.removeHeader("etag");
+  res.setHeader("location", encodeURI(req.params.url));
+  res.statusCode = 302;
+  res.end();
+}
+
+function compress(req, res, input) {
+  const format = "webp";
+  sharp.cache(false);
+  sharp.simd(true);
+  sharp.concurrency(1);
+  const transformer = sharp({ unlimited: true });
+
+  input.pipe(transformer);
+
+  transformer
+    .metadata()
+    .then((metadata) => {
+      if (metadata.height > 16383) {
+        transformer.resize({ height: 16383 });
+      }
+
+      transformer
+        .grayscale(req.params.grayscale)
+        .toFormat(format, {
+          quality: req.params.quality,
+          lossless: false,
+          effort: 0,
+        });
+
+      res.setHeader("content-type", `image/${format}`);
+      res.setHeader("x-original-size", req.params.originSize);
+
+      transformer
+        .on("data", (chunk) => res.write(chunk))
+        .on("end", () => res.end())
+        .on("info", (info) => {
+          res.setHeader("content-length", info.size);
+          res.setHeader("x-bytes-saved", req.params.originSize - info.size);
+        })
+        .on("error", (err) => {
+          console.error("Compression error:", err.message);
+          redirect(req, res);
+        });
+    })
+    .catch((err) => {
+      console.error("Metadata error:", err.message);
+      redirect(req, res);
+    });
+}
+
+async function hhproxy(req, res) {
+  const url = req.query.url;
   if (!url) {
-    return res.status(400).send("Missing URL parameter.");
+    return res.send("bandwidth-hero-proxy");
   }
+
+  req.params = {
+    url: decodeURIComponent(url),
+    webp: !req.query.jpeg,
+    grayscale: req.query.bw !== "0",
+    quality: parseInt(req.query.l, 10) || DEFAULT_QUALITY,
+  };
+
+  const userAgent = new UserAgent().toString();
+  const options = {
+    responseType: "stream",
+    headers: {
+      "User-Agent": userAgent,
+      ...req.headers,
+    },
+    maxRedirects: 4,
+    timeout: 5000,
+  };
 
   try {
-    const imageResponse = await fetchImage(decodeURIComponent(url));
-    const { headers } = imageResponse;
+    const response = await axios.get(req.params.url, options);
 
-    // Prepare the request parameters
-    req.params = {
-      originType: headers["content-type"] || "",
-      originSize: parseInt(headers["content-length"] || "0", 10),
-      webp: format === "webp",
-    };
+    req.params.originType = response.headers["content-type"] || "";
+    req.params.originSize = parseInt(response.headers["content-length"] || "0", 10);
 
-    // If image should be compressed, apply compression
     if (shouldCompress(req)) {
-      res.setHeader("Content-Type", `image/${format}`);
-      res.setHeader("Access-Control-Allow-Origin", "*");
-
-      const compressedStream = compressImageStream(
-        imageResponse.data,
-        format,
-        parseInt(quality, 10)
-      );
-
-      compressedStream.pipe(res);
+      compress(req, res, response.data);
     } else {
-      // Otherwise, stream the original image
-      res.setHeader("Content-Type", req.params.originType);
-      res.setHeader("Access-Control-Allow-Origin", "*");
-
-      imageResponse.data.pipe(res);
+      copyHeaders(response, res);
+      res.setHeader("X-Proxy-Bypass", 1);
+      response.data.pipe(res);
     }
   } catch (err) {
-    console.error("Error processing image:", err.message);
-    res.status(500).send("Internal Server Error.");
+    console.error("Request error:", err.message);
+    redirect(req, res);
   }
 }
+
+export default hhproxy;
