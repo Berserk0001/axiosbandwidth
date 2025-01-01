@@ -2,6 +2,7 @@
 import axios from "axios";
 import sharp from "sharp";
 import UserAgent from "user-agents";
+import https from "https";
 
 const DEFAULT_QUALITY = 40;
 const MIN_COMPRESS_LENGTH = 1024;
@@ -97,7 +98,7 @@ function compress(req, res, input) {
 async function hhproxy(req, res) {
   const url = req.query.url;
   if (!url) {
-    return res.end("bandwidth-hero-proxy");
+    return res.send("bandwidth-hero-proxy");
   }
 
   req.params = {
@@ -108,7 +109,15 @@ async function hhproxy(req, res) {
   };
 
   const userAgent = new UserAgent().toString();
+
+  // Create custom https agent to handle SSL issues
+  const agent = new https.Agent({
+    rejectUnauthorized: true,  // Ensure unauthorized certificates are rejected
+    secureProtocol: 'TLS_method', // Force TLS method
+  });
+
   const options = {
+    httpsAgent: agent,  // Use the custom https agent
     responseType: "stream",
     headers: {
       "User-Agent": userAgent,
