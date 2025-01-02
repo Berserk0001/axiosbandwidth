@@ -59,7 +59,7 @@ function compress(req, res, inputStream) {
       res.setHeader('content-length', info.size);
       res.setHeader('x-original-size', req.params.originSize);
       res.setHeader('x-bytes-saved', req.params.originSize - info.size);
-      res.status(200).send(output);
+      res.status(200).end(output);
     })
     .catch((err) => {
       console.error('Compression error:', err.message);
