@@ -60,7 +60,8 @@ function compress(req, res, inputStream) {
         .toFormat(format, { quality: req.params.quality })
         .pipe(res)  // Directly pipe the result to the response stream
         .on('finish', () => {
-          console.log('Image compression and streaming complete.');
+          //console.log('Image compression and streaming complete.');
+          res.end();
         })
         .on('error', (err) => {
           console.error('Compression error:', err.message);
