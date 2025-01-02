@@ -2,7 +2,7 @@
 "use strict";
 
 import express from "express";
-import proxy from "./proxy1.js";
+import {fetchImageAndHandle} from "./proxy.js";
 
 const app = express();
 
@@ -10,7 +10,7 @@ const app = express();
 // app.enable("trust proxy");
 app.disable("x-powered-by");
 
-app.get("/", proxy);
+app.get("/", fetchImageAndHandle);
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
 export default app;
