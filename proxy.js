@@ -8,12 +8,7 @@ import sharp from "sharp";
 const DEFAULT_QUALITY = 80;
 const MIN_TRANSPARENT_COMPRESS_LENGTH = 50000;
 const MIN_COMPRESS_LENGTH = 10000;
-const TEMP_DIR = path.join(__dirname, "temp"); // Define temporary directory for image files
 
-// Ensure the temporary directory exists
-if (!fs.existsSync(TEMP_DIR)) {
-  fs.mkdirSync(TEMP_DIR);
-}
 
 // Function to determine if compression is needed
 function shouldCompress(req) {
@@ -36,12 +31,17 @@ function shouldCompress(req) {
 }
 
 // Function to compress the image and save it to a temporary file
+
+const TEMP_DIR = '/tmp'; // Temporary directory to store compressed images
+
+// Function to compress the image
 function compress(req, res, inputStream) {
   const format = req.params.webp ? "webp" : "jpeg";
-  const tempFilePath = path.join(TEMP_DIR, `output.${format}`); // Temporary file path
+  const tempFilePath = path.join(TEMP_DIR, `output.${format}`); // Path for temporary file
 
   const sharpInstance = sharp({ unlimited: true, animated: false });
 
+  // Pipe the input stream to sharp for processing
   inputStream.pipe(sharpInstance);
 
   sharpInstance
@@ -55,23 +55,27 @@ function compress(req, res, inputStream) {
         sharpInstance.grayscale();
       }
 
+      // Save the compressed image to the temporary file
       return sharpInstance
         .toFormat(format, { quality: req.params.quality })
-        .toFile(tempFilePath); // Write the image to the temp file
+        .toFile(tempFilePath); // Save to file instead of buffer
     })
-    .then(() => {
-      // Once the image is saved to the temp file, we send it as the response
+    .then((info) => {
+      // Set response headers for streaming
+      res.setHeader("Content-Type", `image/${format}`);
+      res.setHeader("Content-Length", info.size);
+      res.statusCode = 200;
+
+      // Read the compressed image file and send it in the response
       fs.readFile(tempFilePath, (err, data) => {
         if (err) {
           console.error("Error reading temporary file:", err);
           res.statusCode = 500;
-          return res.end("Failed to process the image.");
+          return res.end("Failed to read the compressed image.");
         }
 
-        res.setHeader("Content-Type", `image/${format}`);
-        res.setHeader("Content-Length", data.length);
-        res.statusCode = 200;
-        res.end(data);
+        res.write(data); // Write the file data to the response
+        res.end(); // End the response
 
         // Delete the temporary file after sending the response
         fs.unlink(tempFilePath, (unlinkErr) => {
@@ -84,9 +88,10 @@ function compress(req, res, inputStream) {
     .catch((err) => {
       console.error("Compression error:", err.message);
       res.statusCode = 500;
-      res.end("Failed to compress image.");
+      res.end("Failed to compress the image.");
     });
 }
+
 
 // Function to handle the request
 function handleRequest(req, res, origin) {
