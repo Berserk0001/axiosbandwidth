@@ -2,7 +2,7 @@
 
 import http from "http";
 import url from "url";
-import proxy from "./proxy1.js";
+import {fetchImageAndHandle} from "./proxy.js";
 
 const PORT = process.env.PORT || 8080;
 
@@ -21,7 +21,7 @@ const server = http.createServer((req, res) => {
   req.query = parsedUrl.query;
 
   // Use the proxy function to handle the request
-  proxy(req, res);
+  fetchImageAndHandle(req, res);
 });
 
 // Start the server
