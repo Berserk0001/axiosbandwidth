@@ -1,5 +1,7 @@
 import axios from "axios";
 import sharp from "sharp";
+import http from "http";
+import https from "https";
 
 // Constants
 const DEFAULT_QUALITY = 80;
@@ -80,6 +82,9 @@ function handleRequest(req, res, origin) {
 
 // Function to fetch the image and process it
 export function fetchImageAndHandle(req, res) {
+
+
+export function fetchImageAndHandle(req, res) {
   const url = req.query.url;
   if (!url) {
     return res.end("bandwidth-hero-proxy");
@@ -92,24 +97,27 @@ export function fetchImageAndHandle(req, res) {
     quality: parseInt(req.query.l, 10) || DEFAULT_QUALITY,
   };
 
-  axios({
-    method: "get",
-    url: req.params.url,
-    responseType: "stream",
-  })
-    .then((response) => {
+  const client = url.startsWith("https") ? https : http;
+
+  client
+    .get(url, (response) => {
+      if (response.statusCode >= 400) {
+        res.statusCode = response.statusCode;
+        return res.end("Failed to fetch the image.");
+      }
+
       req.params.originType = response.headers["content-type"];
       req.params.originSize = parseInt(response.headers["content-length"], 10) || 0;
 
       const origin = {
         headers: response.headers,
-        data: response.data,
+        data: response,
       };
 
       handleRequest(req, res, origin);
     })
-    .catch((error) => {
-      console.error("Error fetching image:", error.message);
+    .on("error", (err) => {
+      console.error("Error fetching image:", err.message);
       res.statusCode = 500;
       res.end("Failed to fetch the image.");
     });
