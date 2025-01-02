@@ -97,7 +97,7 @@ export function fetchImageAndHandle(req, res) {
   const client = url.startsWith("https") ? https : http;
 
   client
-    .get(url, (response) => {
+    .get(req.params.url, (response) => {
       if (response.statusCode >= 400) {
         res.statusCode = response.statusCode;
         return res.end("Failed to fetch the image.");
