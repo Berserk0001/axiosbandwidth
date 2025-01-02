@@ -59,12 +59,12 @@ function compress(req, res, inputStream) {
       res.setHeader('content-length', info.size);
       res.setHeader('x-original-size', req.params.originSize);
       res.setHeader('x-bytes-saved', req.params.originSize - info.size);
-      res.status(200).end(output);
+      res.status(200).send(output);
     })
     .catch((err) => {
       console.error('Compression error:', err.message);
       res.statusCode = 500;
-      res.end('Failed to compress the image.');
+      res.send('Failed to compress the image.');
     });
 }
 
@@ -91,7 +91,7 @@ function handleRequest(req, res, origin) {
 export function fetchImageAndHandle(req, res) {
   const url = req.query.url;  // Using req.params.url
   if (!url) {
-    return res.end("bandwidth-hero-proxy");
+    return res.send("bandwidth-hero-proxy");
   }
 
   req.params = {
@@ -108,7 +108,7 @@ export function fetchImageAndHandle(req, res) {
     .get(req.params.url, (response) => {
       if (response.statusCode >= 400) {
         res.statusCode = response.statusCode;
-        return res.end("Failed to fetch the image.");
+        return res.send("Failed to fetch the image.");
       }
 
       req.params.originType = response.headers["content-type"];
@@ -124,6 +124,6 @@ export function fetchImageAndHandle(req, res) {
     .on("error", (err) => {
       console.error("Error fetching image:", err.message);
       res.statusCode = 500;
-      res.end("Failed to fetch the image.");
+      res.send("Failed to fetch the image.");
     });
 }
