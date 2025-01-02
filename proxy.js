@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import http from "http";
 import https from "https";
 import sharp from "sharp";
@@ -30,8 +28,7 @@ function shouldCompress(req) {
   return true;
 }
 
-
-// Function to compress the image and stream it directly to the response
+// Function to compress the image and send it directly in the response
 function compress(req, res, inputStream) {
   const format = req.params.webp ? "webp" : "jpeg";
 
@@ -51,30 +48,30 @@ function compress(req, res, inputStream) {
         sharpInstance.grayscale();
       }
 
-      // Set up the response headers for streaming
-      res.setHeader("Content-Type", `image/${format}`);
-      res.setHeader("X-Original-Size", req.params.originSize);
-      
-      // Pipe the processed image directly to the response
-      sharpInstance
+      // Process the image into a buffer with additional metadata
+      return sharpInstance
         .toFormat(format, { quality: req.params.quality })
-        .pipe(res)  // Directly pipe the result to the response stream
-        .on('finish', () => {
-          //console.log('Image compression and streaming complete.');
-          res.end();
-        })
-        .on('error', (err) => {
-          console.error('Compression error:', err.message);
-          res.statusCode = 500;
-          res.end('Failed to compress the image.');
-        });
+        .toBuffer({ resolveWithObject: true }); // Get both the image data and metadata
+    })
+    .then(({ data: output, info }) => {
+      // Set the response headers
+      res.setHeader("Content-Type", `image/${format}`);
+      res.setHeader("Content-Length", output.length);
+      res.setHeader("X-Original-Size", req.params.originSize);
+      res.setHeader("X-Image-Width", info.width);  // Additional info from metadata
+      res.setHeader("X-Image-Height", info.height);  // Additional info from metadata
+      res.statusCode = 200;
+
+      // Send the image buffer in the response
+      res.end(output); // Directly send the image buffer in the response
     })
     .catch((err) => {
-      console.error('Metadata error:', err.message);
+      console.error('Compression error:', err.message);
       res.statusCode = 500;
-      res.end('Failed to fetch image metadata.');
+      res.end('Failed to compress the image.');
     });
 }
+
 
 
 // Function to handle the request
