@@ -82,9 +82,6 @@ function handleRequest(req, res, origin) {
 
 // Function to fetch the image and process it
 export function fetchImageAndHandle(req, res) {
-
-
-export function fetchImageAndHandle(req, res) {
   const url = req.query.url;
   if (!url) {
     return res.end("bandwidth-hero-proxy");
