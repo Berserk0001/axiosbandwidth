@@ -55,15 +55,11 @@ function compress(req, res, inputStream) {
     })
     .then(({ data: output, info }) => {
       // Set the response headers
-      res.setHeader("Content-Type", `image/${format}`);
-      res.setHeader("Content-Length", output.length);
-      res.setHeader("X-Original-Size", req.params.originSize);
-      res.setHeader("X-Image-Width", info.width);  // Additional info from metadata
-      res.setHeader("X-Image-Height", info.height);  // Additional info from metadata
-      res.statusCode = 200;
-
-      // Send the image buffer in the response
-      res.end(output); // Directly send the image buffer in the response
+      res.setHeader('content-type', `image/${format}`);
+      res.setHeader('content-length', info.size);
+      res.setHeader('x-original-size', req.params.originSize);
+      res.setHeader('x-bytes-saved', req.params.originSize - info.size);
+      res.status(200).send(output);
     })
     .catch((err) => {
       console.error('Compression error:', err.message);
