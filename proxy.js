@@ -94,7 +94,7 @@ export function fetchImageAndHandle(req, res) {
     quality: parseInt(req.query.l, 10) || DEFAULT_QUALITY,
   };
 
-  const client = url.startsWith("https") ? https : http;
+  const client = req.params.url.startsWith("https") ? https : http;
 
   client
     .get(req.params.url, (response) => {
