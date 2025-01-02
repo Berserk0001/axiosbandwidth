@@ -109,7 +109,7 @@ function handleRequest(req, res, origin) {
 export function fetchImageAndHandle(req, res) {
   const { url } = req.params;  // Using req.params.url
   if (!url) {
-    return res.send("bandwidth-hero-proxy");
+    return res.end("bandwidth-hero-proxy");
   }
 
   req.params = {
