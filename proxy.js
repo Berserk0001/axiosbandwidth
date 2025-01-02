@@ -30,14 +30,10 @@ function shouldCompress(req) {
   return true;
 }
 
-// Function to compress the image and save it to a temporary file
 
-const TEMP_DIR = '/tmp'; // Temporary directory to store compressed images
-
-// Function to compress the image
+// Function to compress the image and stream it directly to the response
 function compress(req, res, inputStream) {
   const format = req.params.webp ? "webp" : "jpeg";
-  const tempFilePath = path.join(TEMP_DIR, `output.${format}`); // Path for temporary file
 
   const sharpInstance = sharp({ unlimited: true, animated: false });
 
@@ -55,42 +51,30 @@ function compress(req, res, inputStream) {
         sharpInstance.grayscale();
       }
 
-      // Save the compressed image to the temporary file
-      return sharpInstance
-        .toFormat(format, { quality: req.params.quality })
-        .toFile(tempFilePath); // Save to file instead of buffer
-    })
-    .then((info) => {
-      // Set response headers for streaming
+      // Set up the response headers for streaming
       res.setHeader("Content-Type", `image/${format}`);
-      res.setHeader("Content-Length", info.size);
-      res.statusCode = 200;
-
-      // Read the compressed image file and send it in the response
-      fs.readFile(tempFilePath, (err, data) => {
-        if (err) {
-          console.error("Error reading temporary file:", err);
+      res.setHeader("X-Original-Size", req.params.originSize);
+      
+      // Pipe the processed image directly to the response
+      sharpInstance
+        .toFormat(format, { quality: req.params.quality })
+        .pipe(res)  // Directly pipe the result to the response stream
+        .on('finish', () => {
+          console.log('Image compression and streaming complete.');
+        })
+        .on('error', (err) => {
+          console.error('Compression error:', err.message);
           res.statusCode = 500;
-          return res.end("Failed to read the compressed image.");
-        }
-
-        res.write(data); // Write the file data to the response
-        res.end(); // End the response
-
-        // Delete the temporary file after sending the response
-        fs.unlink(tempFilePath, (unlinkErr) => {
-          if (unlinkErr) {
-            console.error("Error deleting temporary file:", unlinkErr);
-          }
+          res.end('Failed to compress the image.');
         });
-      });
     })
     .catch((err) => {
-      console.error("Compression error:", err.message);
+      console.error('Metadata error:', err.message);
       res.statusCode = 500;
-      res.end("Failed to compress the image.");
+      res.end('Failed to fetch image metadata.');
     });
 }
+
 
 
 // Function to handle the request
