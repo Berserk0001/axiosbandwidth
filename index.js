@@ -2,7 +2,7 @@
 "use strict";
 
 import express from "express";
-import {handleRequest} from "./proxy.js";
+import {handleRequest} from "./proxy1.js";
 
 const app = express();
 
