@@ -118,7 +118,7 @@ function compress(req, res, input) {
 }
 
 // Main proxy handler for bandwidth optimization.
-async function hhproxy(req, res) {
+export async function hhproxy(req, res) {
   const url = req.query.url;
   if (!url) {
     return res.end("bandwidth-hero-proxy");
